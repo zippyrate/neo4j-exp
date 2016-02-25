@@ -28,10 +28,12 @@ public class Neo4jExp
   private static final String NEO4J_TEMP_DIR = "neo4j_temp_dir";
   private static final String USER_LABEL_NAME = "User";
   private static final String USERNAME_PROPERTY_NAME = "username";
+  private static final String GROUP_LABEL_NAME = "Group";
+  private static final String GROUP_NAME_PROPERTY_NAME = "groupName";
 
   private static enum RelTypes implements RelationshipType
   {
-    KNOWS
+    HAS_MEMBER
   }
 
   public static void main(String[] args)
@@ -42,34 +44,26 @@ public class Neo4jExp
         .newEmbeddedDatabase(databaseFilePath.toFile());
       registerShutdownHook(graphDatabase);
       createUserNodes(graphDatabase);
-      findUser(graphDatabase, "34");
-      deleteUser(graphDatabase, "44");
-      dropIndex(graphDatabase);
+
+      //query(graphDatabase, "match (n:User { username: \"User32\" } ) return n");
+      //query(graphDatabase, "match (n:User) return n");
+
+//      query(graphDatabase, "CREATE (a:Person { name:\"Tom Hanks\", born:1956 }) " +
+//        "-[r:ACTED_IN { roles: [\"Forrest\"]}]-> (m:Movie { title:\"Forrest Gump\",released:1994 })");
+      //query(graphDatabase, "match ( g-[r:HAS_MEMBER]->u) return g, r, u");
+      query(graphDatabase, "match ( g-[r:HAS_MEMBER]->u) WHERE g.groupName = \"A Group\" return g, r, u");
+
       graphDatabase.shutdown();
     } catch (IOException e) {
       System.err.println("IO error opening database " + e.getMessage());
     }
   }
 
-  private static void createHelloWorldNodes(GraphDatabaseService graphDatabase)
-  {
-    try (Transaction transaction = graphDatabase.beginTx()) {
-      Node firstNode = graphDatabase.createNode();
-      firstNode.setProperty("message", "Hello, ");
-      Node secondNode = graphDatabase.createNode();
-      secondNode.setProperty("message", "World!");
-
-      Relationship relationship = firstNode.createRelationshipTo(secondNode, RelTypes.KNOWS);
-      relationship.setProperty("message", "brave Neo4j");
-      transaction.success();
-    }
-  }
-
-  private static void query(GraphDatabaseService graphDatabase)
+  private static void query(GraphDatabaseService graphDatabase, String query)
   {
     try (
       Transaction ignored = graphDatabase.beginTx();
-      Result result = graphDatabase.execute("match (n) return n")
+      Result result = graphDatabase.execute(query)
     )
 
     {
@@ -85,12 +79,22 @@ public class Neo4jExp
   private static void createUserNodes(GraphDatabaseService graphDatabase)
   {
     try (Transaction tx = graphDatabase.beginTx()) {
-      Label label = DynamicLabel.label(USER_LABEL_NAME);
+      Label groupLabel = DynamicLabel.label(GROUP_LABEL_NAME);
+      Label userLabel = DynamicLabel.label(USER_LABEL_NAME);
+
+      Node groupNode = graphDatabase.createNode(groupLabel);
+      groupNode.setProperty(GROUP_NAME_PROPERTY_NAME, "A Group");
+
+      System.out.println("Group created");
 
       // Create some users
       for (int id = 0; id < 100; id++) {
-        Node userNode = graphDatabase.createNode(label);
-        userNode.setProperty(USERNAME_PROPERTY_NAME, USER_LABEL_NAME + id);
+        Node userNode = graphDatabase.createNode(userLabel);
+        String userID = USER_LABEL_NAME + id;
+        userNode.setProperty(USERNAME_PROPERTY_NAME, userID);
+
+        Relationship relationship = groupNode.createRelationshipTo(userNode, RelTypes.HAS_MEMBER);
+        relationship.setProperty("message", "has a user " + userID);
       }
       System.out.println("Users created");
       tx.success();
